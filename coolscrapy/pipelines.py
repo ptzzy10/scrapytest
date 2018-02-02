@@ -28,18 +28,17 @@ def session_scope(Session):
     """Provide a transactional scope around a series of operations."""
     session = Session()
     session.expire_on_commit = False
-    print("session_scope 1")
+
     try:
-        print("session_scope 2")
         yield session
-        print("session_scope 3")
+        print("session_scope commit")
         session.commit()
     except:
-        print("session_scope 4")
+        print("session_scope rollback")
         session.rollback()
         raise
     finally:
-        print("session_scope 5")
+        print("session_scope close")
         session.close()
 
 class ArticleDataBasePipeline(object):
@@ -167,12 +166,21 @@ class NovelSortPipeline(object):
 
     def process_item(self, item, spider):
         print('=====NovelSortPipeline process_item')
+        sort_name_tmp = item["sort_name"]
+        sort_url_tmp = item["sort_url"]
         a = NovelSort(
-                       sort_name=item["sort_name"],
-                        sort_url=item["sort_url"],
+                       sort_name=sort_name_tmp,
+                        sort_url=sort_url_tmp,
                      )
+
         with session_scope(self.Session) as session:
-            session.add(a)
+            stored_novel_sort = session.query(NovelSort).filter(NovelSort.sort_name == item["sort_name"]).first()
+            # 在stu2表，查到StudyRecord表的记录
+            if(stored_novel_sort):
+                print("该分类已经存储，sort_name=%s"%(sort_name_tmp))
+            else:
+                print("增加新分类，sort_name=%s" % (sort_name_tmp))
+                session.add(a)
 
 class NovelMainInfoPipeline(object):
 

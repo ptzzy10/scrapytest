@@ -9,7 +9,7 @@ import datetime
 from sqlalchemy.engine.url import URL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, DATE, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, sessionmaker
 
 from coolscrapy.settings import DATABASE
 
@@ -25,6 +25,11 @@ def db_connect():
 def create_news_table(engine):
     """"""
     Base.metadata.create_all(engine)
+
+def create_seesion(engine):
+    Session_class = sessionmaker(bind=engine)  # 创建与数据库的会话session class ,注意,这里返回给session的是个class,不是实例
+    session = Session_class()  # 生成session实例 #cursor
+    return session
 
 
 def _get_date():
@@ -84,7 +89,7 @@ class NovelSort(Base):
     __tablename__ = 'novel_sort'
 
     sort_id = Column(Integer,primary_key=True)
-    sort_name = Column(String(30),nullable=False)#分类名
+    sort_name = Column(String(30),unique=True,nullable=False)#分类名
     sort_url = Column(String(100),nullable=False)#分类地址
 
 class NovelMainInfo(Base):
@@ -92,7 +97,7 @@ class NovelMainInfo(Base):
     __tablename__ = 'novel_main_info'
 
     novel_id = Column(Integer, primary_key=True)
-    novel_name = Column(String(100),nullable=False)  # 小说名
+    novel_name = Column(String(100),unique=True,nullable=False)  # 小说名
     status =  Column(String(10),nullable=False)  # 状态：连载中、完结
     author = Column(String(30),nullable=False)  # 作者名字
     last_update_time = Column(DATE,nullable=False) #最后更新时间
@@ -107,23 +112,23 @@ class NovelJuan(Base):
     __tablename__ = 'novel_juan'
 
     juan_id = Column(Integer, primary_key=True)
-    juan_name = Column(String(100), nullable=False)  # 分卷名
+    juan_name = Column(String(100), unique=True,nullable=False)  # 分卷名
     novel_id = Column(Integer, ForeignKey("novel_main_info.novel_id"))  # 所属小说 ------外键关联------
     # 这个nb，允许你在NovelJuan表里通过backref字段反向查出所有它在NovelMainInfo表里的关联项数据
-    novel_main_info = relationship("NovelMainInfo", backref="my_novel")  # 添加关系，反查（在内存里）
+    #novel_main_info = relationship("NovelMainInfo", backref="my_novel")  # 添加关系，反查（在内存里）
 
 class NovelChapter(Base):
     '''小说章节信息'''
     __tablename__ = 'novel_chapter'
 
     chapter_id = Column(Integer, primary_key=True)
-    chapter_name = Column(String(100), nullable=False)  # 分类名
+    chapter_name = Column(String(100), unique=True,nullable=False)  # 分类名
     charpter_url = Column(String(100), nullable=False)  # 章节内容地址
     novel_id = Column(Integer, ForeignKey("novel_main_info.novel_id"))  # 所属小说 ------外键关联------
     juan_id = Column(Integer, ForeignKey("novel_juan.juan_id"))  # 所属卷本 ------外键关联------
     # 这个nb，允许你在NovelMainInfo表里通过backref字段反向查出所有它在NovelSort表里的关联项数据
-    novel_main_info = relationship("NovelMainInfo", backref="my_novel")  # 添加关系，反查（在内存里）
-    novel_juan = relationship("NovelJuan", backref="my_juan")  # 添加关系，反查（在内存里）
+    #novel_main_info = relationship("NovelMainInfo", backref="my_novel")  # 添加关系，反查（在内存里）
+    #novel_juan = relationship("NovelJuan", backref="my_juan")  # 添加关系，反查（在内存里）
 
 class NovelContent(Base):
     '''小说内容信息'''
@@ -135,6 +140,6 @@ class NovelContent(Base):
     juan_id = Column(Integer, ForeignKey("novel_juan.juan_id"))  # 所属卷本 ------外键关联------
     chapter_id = Column(Integer, ForeignKey("novel_chapter.chapter_id"))  # 所属章节 ------外键关联------
     # 这个nb，允许你在NovelMainInfo表里通过backref字段反向查出所有它在NovelSort表里的关联项数据
-    novel_main_info = relationship("NovelMainInfo", backref="my_novel")  # 添加关系，反查（在内存里）
-    novel_juan = relationship("NovelJuan", backref="my_juan")  # 添加关系，反查（在内存里）
-    novel_chapter = relationship("NovelChapter", backref="my_chapter")  # 添加关系，反查（在内存里）
+    #novel_main_info = relationship("NovelMainInfo", backref="my_novel")  # 添加关系，反查（在内存里）
+    #novel_juan = relationship("NovelJuan", backref="my_juan")  # 添加关系，反查（在内存里）
+    #novel_chapter = relationship("NovelChapter", backref="my_chapter")  # 添加关系，反查（在内存里）

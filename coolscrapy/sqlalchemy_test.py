@@ -27,7 +27,7 @@ Session_class = sessionmaker(bind=engine)  # 实例和engine绑定
 Session = Session_class()  # 生成session实例，相当于游标
 
 #插入一条数据
-sqlid = 53
+sqlid = 54
 user_obj = User(id=sqlid,name="你好",password="123456")  # 生成你要创建的数据对象
 #print(user_obj.name,user_obj.id)  # 此时还没创建对象呢，不信你打印一下id发现还是None
 

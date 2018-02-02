@@ -12,49 +12,84 @@ class QuanshuSpider(scrapy.Spider):
     allowed_domains = ["quanshuwang.com"]
     start_urls = ["http://www.quanshuwang.com/index.html"]
 
-    def parse(self, response):
-        self.logger.info('Hi, this is an item page! %s', response.url)
-        '''
-        result = response.text
-        title_reg = r'<ul class="channel-nav-list">(.*?)</ul>'
-        url_list = re.findall(title_reg, result)
-        print(url_list)
-        reg2 =r'<a href="(.*?)">(.*?)</a>'
-        novel_url_list = re.findall(reg2, url_list)
-        print(novel_url_list)
-        #获取地址sdf 士大夫fsd f 士大夫 
-'''
-
-        fenlei_urls = response.xpath("//ul[@class='channel-nav-list']/li/a/@href").extract()
-        fenlei_ming = response.xpath("//ul[@class='channel-nav-list']/li/a/text()").extract()
-        item = NovelSortItem()
-        item['sort_name'] = fenlei_ming
-        item['sort_url'] = fenlei_urls
-        yield  item
-        self.logger.info('=========================')
-        for url in fenlei_urls:
-            yield Request(url, callback=self.parse_xiaoshuoming)
-
     def get_total_page_num(self,response):#获取某类小说总页数
         numall_str = response.xpath('//em[@id="pagestats"]/text()').extract()
         total_page_num = int((numall_str[0].split('/'))[1])
         self.logger.info('response.url = %s,tatal_page_num = %d' % (response.url, total_page_num))
         return total_page_num
 
-    def get_xiaoshuo_mingzi_jianjieurl(self,response):
+    #获取小说名字及简介地址
+    def get_novel_name_breifurl(self,response):
         reg = r'<a target="_blank" title="(.*?)" href="(.*?)" class="clearfix stitle">'
-        xiaoshuo_mingzi_jianjieurl = re.findall(reg,response.text)
-        self.logger.info(xiaoshuo_mingzi_jianjieurl)
-        return xiaoshuo_mingzi_jianjieurl
+        novel_name_breifurl = re.findall(reg,response.text)
+        self.logger.info(novel_name_breifurl)
+        return novel_name_breifurl
+
+    #获取小说主要信息，如：作者、内容简介、小说状态、最近更新时间
+    def get_novel_main_info(self,breifurl):
+        response = self.get_req(breifurl)
+        reg_breif = r'<div id="waa".*?>(.*?)</div>'
+        breif = re.findall(reg_breif,response.text)
+
+        reg_pic = r'<img.*?src="(.*?)".*?>'
+        pic = re.findall(reg_pic, response.text)
+
+
+        novel_book_detail = response.xpath("//div[@class=bookDetail]/dl/dd")
+        status = novel_book_detail.xpath('/ul/li/')
+
+        novel['author'] = novel_book_detail[1].extract()
+
+        status = Column(String(10), nullable=False)  # 状态：连载中、完结
+        author = Column(String(30), nullable=False)  # 作者名字
+        last_update_time = Column(DATE, nullable=False)  # 最后更新时间
+        breif = Column(String(1024), nullable=False)  # 简介
+        total_charpter_url = Column(String(100), nullable=False)  # 总章节地址
 
     def parse_xiaoshuoming(self,response):
         total_page_num = self.get_total_page_num(response)
         base_url = response.url.split('_')[0]
-        self.get_xiaoshuo_mingzi_jianjieurl(response)
+        self.get_novel_name_breifurl(response)
         for page_num in range(2,total_page_num):
             next_page_url = base_url+'_'+str(page_num)+'.html'
             next_response = requests.get(next_page_url)
             next_response.encoding = 'gbk'
-            self.get_xiaoshuo_mingzi_jianjieurl(next_response)
+            self.get_novel_name_breifurl(next_response)
         #yield Request(next_page_url, callback=self.parse_xiaoshuoming)
         pass
+
+    def get_req(self,url):
+        response = requests.get(url)
+        response.encoding = 'gbk'
+        return response
+
+    def get_novel_main_info_of_onesort(self,sort_url):#获取某个分类所有小说的主要信息
+        response = self.get_req(sort_url)
+        #1.获取总的页数
+        total_page_num = self.get_total_page_num(response)
+        #2.获取第一页里面所有小说信息
+        self.get_novel_name_breifurl(response)
+
+
+    def parse(self, response):
+        self.logger.info('Hi, this is an item page! %s', response.url)
+        fenlei_urls = response.xpath("//ul[@class='channel-nav-list']/li/a/@href").extract()
+        fenlei_ming = response.xpath("//ul[@class='channel-nav-list']/li/a/text()").extract()
+        item = NovelSortItem()
+
+        for i in range(len(fenlei_ming)):
+            item['sort_name'] = fenlei_ming[i]
+            item['sort_url'] = fenlei_urls[i]
+            yield  item
+        self.logger.info('========小说分类爬取完毕，共计%d分类'%(len(fenlei_ming)))
+
+        return
+        for i in range(len(fenlei_ming)):
+            sort_name = fenlei_ming[i]
+            sort_url = fenlei_urls[i]
+            self.logger.info('开始爬取 [%s] 小说'%(sort_name))
+
+
+        for url in fenlei_urls:
+            yield Request(url, callback=self.parse_xiaoshuoming)
+
