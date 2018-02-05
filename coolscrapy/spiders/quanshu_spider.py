@@ -13,8 +13,9 @@ class QuanshuSpider(scrapy.Spider):
     start_urls = ["http://www.quanshuwang.com/index.html"]
 
     def get_total_page_num(self,response):#获取某类小说总页数
-        numall_str = response.xpath('//em[@id="pagestats"]/text()').extract()
-        total_page_num = int((numall_str[0].split('/'))[1])
+        total_page_reg = r'<em id="pagestats">1/(.*?)</em>'
+        numstr = re.findall(total_page_reg,response.text)
+        total_page_num = int(numstr[0])
         self.logger.info('response.url = %s,tatal_page_num = %d' % (response.url, total_page_num))
         return total_page_num
 
@@ -23,6 +24,9 @@ class QuanshuSpider(scrapy.Spider):
         reg = r'<a target="_blank" title="(.*?)" href="(.*?)" class="clearfix stitle">'
         novel_name_breifurl = re.findall(reg,response.text)
         self.logger.info(novel_name_breifurl)
+        for url in novel_name_breifurl:
+            self.logger.info("开始爬取[ %s ]主要信息，地址为[ %s ]"%(url[0],url[1]))
+            self.get_novel_main_info(url[1])
         return novel_name_breifurl
 
     #获取小说主要信息，如：作者、内容简介、小说状态、最近更新时间
@@ -30,7 +34,7 @@ class QuanshuSpider(scrapy.Spider):
         response = self.get_req(breifurl)
         reg_breif = r'<div id="waa".*?>(.*?)</div>'
         breif = re.findall(reg_breif,response.text)
-
+        self.get_novel_main_info(breif)
         reg_pic = r'<img.*?src="(.*?)".*?>'
         pic = re.findall(reg_pic, response.text)
 
@@ -38,13 +42,11 @@ class QuanshuSpider(scrapy.Spider):
         novel_book_detail = response.xpath("//div[@class=bookDetail]/dl/dd")
         status = novel_book_detail.xpath('/ul/li/')
 
-        novel['author'] = novel_book_detail[1].extract()
+        author = novel_book_detail[1].extract()
 
-        status = Column(String(10), nullable=False)  # 状态：连载中、完结
-        author = Column(String(30), nullable=False)  # 作者名字
-        last_update_time = Column(DATE, nullable=False)  # 最后更新时间
-        breif = Column(String(1024), nullable=False)  # 简介
-        total_charpter_url = Column(String(100), nullable=False)  # 总章节地址
+        #last_update_time = Column(DATE, nullable=False)  # 最后更新时间
+       # breif = Column(String(1024), nullable=False)  # 简介
+       # total_charpter_url = Column(String(100), nullable=False)  # 总章节地址
 
     def parse_xiaoshuoming(self,response):
         total_page_num = self.get_total_page_num(response)
@@ -71,6 +73,7 @@ class QuanshuSpider(scrapy.Spider):
         self.get_novel_name_breifurl(response)
 
 
+
     def parse(self, response):
         self.logger.info('Hi, this is an item page! %s', response.url)
         fenlei_urls = response.xpath("//ul[@class='channel-nav-list']/li/a/@href").extract()
@@ -83,11 +86,12 @@ class QuanshuSpider(scrapy.Spider):
             yield  item
         self.logger.info('========小说分类爬取完毕，共计%d分类'%(len(fenlei_ming)))
 
-        return
+        #return
         for i in range(len(fenlei_ming)):
             sort_name = fenlei_ming[i]
             sort_url = fenlei_urls[i]
             self.logger.info('开始爬取 [%s] 小说'%(sort_name))
+            self.get_novel_main_info_of_onesort(sort_url)
 
 
         for url in fenlei_urls:
