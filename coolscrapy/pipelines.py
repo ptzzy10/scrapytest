@@ -16,7 +16,8 @@ from scrapy.exporters import JsonItemExporter
 from scrapy.pipelines.images import ImagesPipeline
 from scrapy.exceptions import DropItem
 from sqlalchemy.orm import sessionmaker
-from coolscrapy.models import db_connect, create_news_table, Article, XMLInfo, CSVInfo, NovelSort, NovelMainInfo
+from coolscrapy.models import db_connect, create_news_table, Article, XMLInfo, CSVInfo, NovelSort, NovelMainInfo, \
+    NovelJuan, NovelChapter
 
 
 class CoolscrapyPipeline(object):
@@ -156,6 +157,9 @@ class CSVDataPipeline(object):
         print("=====close_spider")
         pass
 
+cur_pipeline_name = ''
+cur_process_item =''
+
 class NovelSortPipeline(object):
 
     def __init__(self):
@@ -165,7 +169,14 @@ class NovelSortPipeline(object):
         pass
 
     def process_item(self, item, spider):
-        print('=====NovelSortPipeline process_item')
+        global cur_pipeline_name,cur_process_item
+        cur_pipeline_name = item.__class__.__name__
+        cur_process_item = item
+        print("NovelSortPipeline cur_pipeline_name:[%s]"%cur_pipeline_name)
+        if(cur_pipeline_name != 'NovelSortItem'):
+            return
+        print('=====小说分类存储 process_item ')
+
         sort_name_tmp = item["sort_name"]
         sort_url_tmp = item["sort_url"]
         a = NovelSort(
@@ -191,18 +202,29 @@ class NovelMainInfoPipeline(object):
         pass
 
     def process_item(self, item, spider):
-        print('=====NovelMainInfoPipeline process_item')
+        global cur_pipeline_name,cur_process_item
+        print("NovelMainInfoPipeline cur_pipeline_name:[%s]" % cur_pipeline_name)
+        if (cur_pipeline_name != 'NovelMainInfoItem'):
+            return
+
+        print('=====小说主要信息存储 process_item')
         a = NovelMainInfo(
-            novel_name=item["novel_name"].encode("utf-8"),
-            status=item["status"].encode("utf-8"),
-            author=item["author"].encode("utf-8"),
-            last_update_time=item["last_update_time"].encode("utf-8"),
-            breif=item["breif"].encode("utf-8"),
-            total_charpter_url=item["total_charpter_url"].encode("utf-8"),
-            sort_id=item["sort_id"].encode("utf-8"),
+            novel_name=cur_process_item["novel_name"],
+            status=cur_process_item["status"],
+            author=cur_process_item["author"],
+            last_update_time=cur_process_item["last_update_time"],
+            breif=cur_process_item["breif"],
+            total_charpter_url=cur_process_item["total_charpter_url"],
         )
         with session_scope(self.Session) as session:
-            session.add(a)
+            stored_novel_sort = session.query(NovelMainInfo).filter(NovelMainInfo.novel_name == cur_process_item["novel_name"]).first()
+            # 在stu2表，查到StudyRecord表的记录
+            if (stored_novel_sort):
+                print("该小说已经存储，sort_name=%s" % (cur_process_item["novel_name"]))
+            else:
+                print("增加新小说，sort_name=%s" % (cur_process_item["novel_name"]))
+                session.add(a)
+
 
 class NovelJuanPipeline(object):
 
@@ -213,13 +235,20 @@ class NovelJuanPipeline(object):
         pass
 
     def process_item(self, item, spider):
-        print('=====NovelJuanPipeline process_item')
-        a = NovelMainInfo(
-            juan_name=item["juan_name"].encode("utf-8"),
-            novel_id=item["novel_id"].encode("utf-8"),
-        )
-        with session_scope(self.Session) as session:
-            session.add(a)
+        global cur_pipeline_name, cur_process_item
+        print("NovelJuanPipeline cur_pipeline_name:[%s]" % cur_pipeline_name)
+        if (cur_pipeline_name != 'NovelJuanItem'):
+            return
+
+        print('=====小说卷名存储 process_item')
+        juan_names = cur_process_item['juan_name']
+        for name in juan_names:
+            a = NovelJuan(
+                juan_name=name,
+                #novel_id=item["novel_id"].encode("utf-8"),
+            )
+            with session_scope(self.Session) as session:
+                session.add(a)
 
 class NovelChapterPipeline(object):
 
@@ -230,8 +259,8 @@ class NovelChapterPipeline(object):
         pass
 
     def process_item(self, item, spider):
-        print('=====NovelChapterPipeline process_item')
-        a = NovelMainInfo(
+        print('=====小说章节名存储 process_item')
+        a = NovelChapter(
             chapter_name=item["chapter_name"].encode("utf-8"),
             charpter_url=item["charpter_url"].encode("utf-8"),
             novel_id=item["novel_id"].encode("utf-8"),
@@ -249,7 +278,7 @@ class NovelContentPipeline(object):
         pass
 
     def process_item(self, item, spider):
-        print('=====NovelContentPipeline process_item')
+        print('=====小说内容存储 process_item')
         a = NovelMainInfo(
             content=item["content"].encode("utf-8"),
             charpter_url=item["charpter_url"].encode("utf-8"),

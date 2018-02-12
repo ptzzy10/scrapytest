@@ -103,9 +103,9 @@ class NovelMainInfo(Base):
     last_update_time = Column(DATE,nullable=False) #最后更新时间
     breif = Column(String(1024),nullable=False) #简介
     total_charpter_url = Column(String(100),nullable=False)  # 总章节地址
-    sort_id = Column(Integer, ForeignKey("novel_sort.sort_id"))  # 所属分类 ------外键关联------
+   # sort_id = Column(Integer, ForeignKey("novel_sort.sort_id"))  # 所属分类 ------外键关联------
     # 这个nb，允许你在NovelMainInfo表里通过backref字段反向查出所有它在NovelSort表里的关联项数据
-    novel_sort = relationship("NovelSort", backref="my_sort")  # 添加关系，反查（在内存里）
+    #novel_sort = relationship("NovelSort", backref="my_sort")  # 添加关系，反查（在内存里）
 
 class NovelJuan(Base):
     '''小说卷本信息'''
@@ -113,7 +113,7 @@ class NovelJuan(Base):
 
     juan_id = Column(Integer, primary_key=True)
     juan_name = Column(String(100), unique=True,nullable=False)  # 分卷名
-    novel_id = Column(Integer, ForeignKey("novel_main_info.novel_id"))  # 所属小说 ------外键关联------
+    #novel_id = Column(Integer, ForeignKey("novel_main_info.novel_id"))  # 所属小说 ------外键关联------
     # 这个nb，允许你在NovelJuan表里通过backref字段反向查出所有它在NovelMainInfo表里的关联项数据
     #novel_main_info = relationship("NovelMainInfo", backref="my_novel")  # 添加关系，反查（在内存里）
 
@@ -126,6 +126,7 @@ class NovelChapter(Base):
     charpter_url = Column(String(100), nullable=False)  # 章节内容地址
     novel_id = Column(Integer, ForeignKey("novel_main_info.novel_id"))  # 所属小说 ------外键关联------
     juan_id = Column(Integer, ForeignKey("novel_juan.juan_id"))  # 所属卷本 ------外键关联------
+
     # 这个nb，允许你在NovelMainInfo表里通过backref字段反向查出所有它在NovelSort表里的关联项数据
     #novel_main_info = relationship("NovelMainInfo", backref="my_novel")  # 添加关系，反查（在内存里）
     #novel_juan = relationship("NovelJuan", backref="my_juan")  # 添加关系，反查（在内存里）
