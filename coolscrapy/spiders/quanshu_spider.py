@@ -4,7 +4,7 @@ from scrapy import Request, Selector
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy.linkextractors import LinkExtractor
 
-from coolscrapy.items import HuxiuItem, LinkItem, NovelSortItem, NovelMainInfoItem, NovelJuanItem
+from coolscrapy.items import HuxiuItem, LinkItem, NovelSortItem, NovelMainInfoItem, NovelJuanItem, NovelChapterItem,NovelContentItem
 import re
 #链接爬取蜘蛛，专门为那些爬取有特定规律的链接内容而准备的。
 from coolscrapy.models import NovelMainInfo
@@ -23,50 +23,56 @@ class QuanshuSpider(scrapy.Spider):
         hxs = Selector(text=response.text)
         content_div = hxs.xpath('//div[@id="content"]')
         content = hxs.xpath('//div[@id="content"]')[0].extract()
-        self.logger.info("获取到小说章节内容。")
         #self.logger.info(content)
+        self.logger.info("获取到小说章节内容。")
+        novel_content_item = NovelContentItem()
+        novel_content_item['novel_name'] = response.meta['novel_name']
+        novel_content_item['juan_name'] = response.meta['juan_name']
+        novel_content_item['chapter_name'] = response.meta['chapter_name']
+        novel_content_item['content'] = content
+
+        yield novel_content_item
         pass
 
     #获取小说总卷及章节目录
     def parse_novel_total_charpter_info(self,response):
         #response = self.get_req(charpter_url)
         hxs = Selector(text=response.text)
-        chapterNum_div =  hxs.xpath('//div[@class="chapterNum"]')[0]
-        chapterNum_div_child = chapterNum_div.xpath('/child::node()').extract()
-
-        t1 = hxs.xpath('//div[@class="dirtitone"]').extract()
-        total_juan_num = len(t1)
-
-        next_dir = chapterNum_div.xpath('./ul/div[@class="dirtitone"]')[0]
-
-        for i in range(total_juan_num):
-            juan_name = next_dir.xpath('h2/text()').extract()[0]
-            chapter_names = next_dir.xpath('../div/li/a/text()').extract()
-            content_urls = next_dir.xpath('../div/li/a/@href').extract()
-            next_dir = next_dir.xpath('../div/div[@class="dirtitone"]')[0]
-
-
-
         juan_names = hxs.xpath('//div[@class="dirtitone"]/h2/text()').extract()
-        juan_names2 = chapterNum_div.xpath('//div[@class="dirtitone"]/h2/text()').extract()
-        juan_names3 = chapterNum_div.xpath('/div[@class="dirtitone"]/h2/text()').extract()
-        #juan_names4 = chapterNum_div.xpath('.div[@class="dirtitone"]/h2/text()').extract()
-        juan_names5 = chapterNum_div.xpath('div[@class="dirtitone"]/h2/text()').extract()
-        chapter_names = hxs.xpath('//div[@class="clearfix dirconone"]/li/a/text()').extract()
-        content_urls = hxs.xpath('//div[@class="clearfix dirconone"]/li/a/@href').extract()
+        total_juan_num = len(juan_names)
+        novel_name = response.meta['novel_name']
 
         juan_item = NovelJuanItem()
         juan_item['juan_name'] = juan_names
+        juan_item['novel_name'] = novel_name
         yield juan_item
 
-        self.logger.info("开始爬取小说章节内容。")
-        for i in range(len(content_urls)):
-            self.logger.info('章节名字:[%s] 章节地址:[%s]'%(chapter_names[i],content_urls[i]))
-            #self.get_novel_one_charpter_content(content_urls[i])
-            yield Request(content_urls[i], callback=self.parse_novel_one_charpter_content,dont_filter=True)
-            if i==0:
-                break
-        pass
+        #chapterNum_div =  hxs.xpath('//div[@class="chapterNum"]')[0]
+        #next_dir = chapterNum_div.xpath('./ul/div[@class="dirtitone"]')[0]
+        next_dir = hxs.xpath('//div[@class="dirtitone"]')[0]
+
+        chapterItem = NovelChapterItem()
+        for i in range(total_juan_num):
+            chapterItem['juan_name'] = next_dir.xpath('h2/text()').extract()[0]
+            chapterItem['chapter_name'] = next_dir.xpath('../div/li/a/text()').extract()
+            chapterItem['content_url'] = next_dir.xpath('../div/li/a/@href').extract()
+            chapterItem['novel_name'] = novel_name
+            next_dirs = next_dir.xpath('../div/div[@class="dirtitone"]')
+            if(next_dirs):
+                next_dir = next_dirs[0]
+
+            yield chapterItem
+            #if i==10:
+            #    break
+
+            self.logger.info("开始爬取小说章节内容。")
+            for j in range(len(chapterItem['content_url'])):
+                self.logger.info('章节名字:[%s] 章节地址:[%s]' % (chapterItem['chapter_name'][j], chapterItem['content_url'][j]))
+                # self.get_novel_one_charpter_content(content_urls[j])
+                yield Request(chapterItem['content_url'][j], callback=self.parse_novel_one_charpter_content,meta={'novel_name':novel_name,'juan_name':chapterItem['juan_name'] ,'chapter_name':chapterItem['chapter_name'][j]},dont_filter=True)
+                #if j == 10:
+                #   break
+       #pass
 
     #获取小说主要信息，如：作者、内容简介、小说状态、最近更新时间
     def parse_novel_main_info(self,response):
@@ -81,9 +87,11 @@ class QuanshuSpider(scrapy.Spider):
         author = book_detail_div.xpath('dl/dd/text()')[1].extract()
         last_update_time = (book_detail_div.xpath('dl/dd/ul/li/text()')[0].extract())[2:-1]
         novel_name = response.meta['novel_name']
+        sort_name = response.meta['sort_name']
         self.logger.info("小说:[%s] 简介:[%s] 总章节地址:[%s] 小说状态:[%s] 作者:[%s] 最后更新时间:[%s]" % (novel_name,breif,total_charpter_url,status,author,last_update_time))
         item = NovelMainInfoItem()
         item['novel_name'] = novel_name
+        item['sort_name'] = sort_name
         item['status'] = status
         item['author'] = author
         item['last_update_time'] = last_update_time
@@ -92,10 +100,24 @@ class QuanshuSpider(scrapy.Spider):
         yield item
 
         #self.get_novel_total_charpter_info(total_charpter_url)
-        total_charpter_url = 'http://www.quanshuwang.com/book/2/2703'
-        yield Request(total_charpter_url, callback=self.parse_novel_total_charpter_info,dont_filter=True)
+        #total_charpter_url = 'http://www.quanshuwang.com/book/2/2703'
+        yield Request(total_charpter_url, callback=self.parse_novel_total_charpter_info,meta={'novel_name':novel_name},dont_filter=True)
         pass
 
+        #获取某个分类小说所有小说的简介地址
+    '''def get_onesort_total_novel_breifurl(self,sort_url,total_pagenum):
+
+        base_url = sort_url.split('_')[0]
+
+
+        for i in range(1,total_pagenum):
+            url = base_url+i+'.html'
+            Request(url[1], callback=self.parse_novel_main_info, meta={'novel_name': url[0], 'sort_name': sort_name},
+                    dont_filter=True)
+
+        return novel_name_breifurl
+
+    '''
     # 获取某个分类所有小说的主要信息
     def parse_novel_main_info_of_onesort(self,response):
         sort_name = response.meta['sort_name']
@@ -112,9 +134,9 @@ class QuanshuSpider(scrapy.Spider):
             self.logger.info("开始爬取[ %s ]主要信息，地址为[ %s ]" % (url[0], url[1]))
             #self.get_novel_main_info(url[1])
             yield Request(url[1], callback=self.parse_novel_main_info,meta={'novel_name':url[0],'sort_name':sort_name},dont_filter=True)
-            i += 1
-            if i==1:
-                break
+            #i += 1
+            #if i==10:
+            #    break
 
         pass
 
@@ -138,6 +160,6 @@ class QuanshuSpider(scrapy.Spider):
             sort_url = fenlei_urls[i]
             self.logger.info('开始爬取 [%s] 分类小说'%(sort_name))
             yield Request(sort_url, callback=self.parse_novel_main_info_of_onesort,meta={'sort_name':sort_name},dont_filter=True)
-            if i==1:
-                break
+            #if i==10:
+            #    break
 

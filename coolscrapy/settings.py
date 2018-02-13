@@ -72,8 +72,8 @@ ITEM_PIPELINES = {
     'coolscrapy.pipelines.NovelSortPipeline': 4,
     'coolscrapy.pipelines.NovelMainInfoPipeline': 5,
     'coolscrapy.pipelines.NovelJuanPipeline': 6,
-   # 'coolscrapy.pipelines.NovelChapterPipeline': 7,
-   # 'coolscrapy.pipelines.NovelContentPipeline': 8,
+    'coolscrapy.pipelines.NovelChapterPipeline': 7,
+    'coolscrapy.pipelines.NovelContentPipeline': 8,
 }
 DATABASE = {'drivername':'mysql',
             'host':'localhost',

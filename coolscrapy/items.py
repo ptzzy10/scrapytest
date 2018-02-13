@@ -63,6 +63,7 @@ class NovelSortItem(scrapy.Item):
 class NovelMainInfoItem(scrapy.Item):
     '''小说主要信息'''
     novel_name = scrapy.Field()  # 小说名
+    sort_name = scrapy.Field()  # 小说分类名
     status =   scrapy.Field()  # 状态：连载中、完结
     author =  scrapy.Field()  # 作者名字
     last_update_time = scrapy.Field() #最后更新时间
@@ -73,12 +74,18 @@ class NovelMainInfoItem(scrapy.Item):
 class NovelJuanItem(scrapy.Item):
     '''小说卷本信息'''
     juan_name = scrapy.Field()  # 分卷名
+    novel_name = scrapy.Field()  # 所属小说名
 
 class NovelChapterItem(scrapy.Item):
     '''小说章节信息'''
     chapter_name = scrapy.Field()  # 分类名
-    charpter_url = scrapy.Field() # 章节内容地址
+    content_url = scrapy.Field() # 章节内容地址
+    juan_name = scrapy.Field()
+    novel_name = scrapy.Field()
 
 class NovelContentItem(scrapy.Item):
     '''小说内容信息'''
     content = scrapy.Field()  # 章节内容
+    chapter_name = scrapy.Field()  # 分类名
+    juan_name = scrapy.Field()
+    novel_name = scrapy.Field()

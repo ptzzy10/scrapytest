@@ -17,7 +17,7 @@ from scrapy.pipelines.images import ImagesPipeline
 from scrapy.exceptions import DropItem
 from sqlalchemy.orm import sessionmaker
 from coolscrapy.models import db_connect, create_news_table, Article, XMLInfo, CSVInfo, NovelSort, NovelMainInfo, \
-    NovelJuan, NovelChapter
+    NovelJuan, NovelChapter, NovelContent
 
 
 class CoolscrapyPipeline(object):
@@ -210,6 +210,7 @@ class NovelMainInfoPipeline(object):
         print('=====小说主要信息存储 process_item')
         a = NovelMainInfo(
             novel_name=cur_process_item["novel_name"],
+            sort_name=cur_process_item["sort_name"],
             status=cur_process_item["status"],
             author=cur_process_item["author"],
             last_update_time=cur_process_item["last_update_time"],
@@ -217,6 +218,7 @@ class NovelMainInfoPipeline(object):
             total_charpter_url=cur_process_item["total_charpter_url"],
         )
         with session_scope(self.Session) as session:
+            #查询该分类是否已存在
             stored_novel_sort = session.query(NovelMainInfo).filter(NovelMainInfo.novel_name == cur_process_item["novel_name"]).first()
             # 在stu2表，查到StudyRecord表的记录
             if (stored_novel_sort):
@@ -242,13 +244,20 @@ class NovelJuanPipeline(object):
 
         print('=====小说卷名存储 process_item')
         juan_names = cur_process_item['juan_name']
+        novel_name2 = cur_process_item['novel_name']
         for name in juan_names:
             a = NovelJuan(
                 juan_name=name,
-                #novel_id=item["novel_id"].encode("utf-8"),
+                novel_name=novel_name2,
             )
             with session_scope(self.Session) as session:
-                session.add(a)
+                # 查询是否已存在
+                stored_tag = session.query(NovelJuan).filter(NovelJuan.juan_name == name).first()
+                if (stored_tag):
+                    print("该卷名已经存储，juan_name=%s" % (name))
+                else:
+                    print("增加新卷名，juan_name=%s" % (name))
+                    session.add(a)
 
 class NovelChapterPipeline(object):
 
@@ -259,15 +268,33 @@ class NovelChapterPipeline(object):
         pass
 
     def process_item(self, item, spider):
+        global cur_pipeline_name, cur_process_item
+        print("NovelChapterPipeline cur_pipeline_name:[%s]" % cur_pipeline_name)
+        if (cur_pipeline_name != 'NovelChapterItem'):
+            return
+
         print('=====小说章节名存储 process_item')
-        a = NovelChapter(
-            chapter_name=item["chapter_name"].encode("utf-8"),
-            charpter_url=item["charpter_url"].encode("utf-8"),
-            novel_id=item["novel_id"].encode("utf-8"),
-            juan_id=item["juan_id"].encode("utf-8"),
-        )
-        with session_scope(self.Session) as session:
-            session.add(a)
+
+        juan_name2 = cur_process_item['juan_name']
+        chapter_names = cur_process_item['chapter_name']
+        content_urls = cur_process_item['content_url']
+        novel_name2 = cur_process_item['novel_name']
+
+        for i in range(len(chapter_names)):
+            a = NovelChapter(
+                chapter_name=chapter_names[i],
+                content_url=content_urls[i],
+                novel_name = novel_name2,
+                juan_name = juan_name2,
+            )
+            with session_scope(self.Session) as session:
+                # 查询是否已存在
+                stored_tag = session.query(NovelChapter).filter(NovelChapter.chapter_name == chapter_names[i]).first()
+                if (stored_tag):
+                    print("该章节已经存储，chapter_names=%s" % (chapter_names[i]))
+                else:
+                    print("增加新章节，chapter_names=%s" % (chapter_names[i]))
+                    session.add(a)
 
 
 class NovelContentPipeline(object):
@@ -278,14 +305,29 @@ class NovelContentPipeline(object):
         pass
 
     def process_item(self, item, spider):
+        global cur_pipeline_name, cur_process_item
+        print("NovelContentPipeline cur_pipeline_name:[%s]" % cur_pipeline_name)
+        if (cur_pipeline_name != 'NovelContentItem'):
+            return
+
         print('=====小说内容存储 process_item')
-        a = NovelMainInfo(
-            content=item["content"].encode("utf-8"),
-            charpter_url=item["charpter_url"].encode("utf-8"),
-            novel_id=item["novel_id"].encode("utf-8"),
-            juan_id=item["juan_id"].encode("utf-8"),
-            chapter_id=item["chapter_id"].encode("utf-8"),
+
+        novel_name2 = cur_process_item['novel_name']
+        juan_name2 = cur_process_item['juan_name']
+        chapter_name2 = cur_process_item['chapter_name']
+        content2 = cur_process_item['content']
+
+        a = NovelContent(
+            content=content2,
+            novel_name=novel_name2,
+            juan_name=juan_name2,
+            chapter_name=chapter_name2,
         )
-        with session_scope(self.Session) as session:
-            session.add(a)
+        with session_scope(self.Session) as session:                # 查询是否已存在
+            stored_tag = session.query(NovelContent).filter(NovelContent.chapter_name == chapter_name2).first()
+            if (stored_tag):
+                print("该章节内容已经存储，chapter_names=%s" % (chapter_name2))
+            else:
+                print("增加新章节内容，chapter_names=%s" % (chapter_name2))
+                session.add(a)
 
