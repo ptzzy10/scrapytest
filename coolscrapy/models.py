@@ -128,6 +128,7 @@ class NovelChapter(Base):
     content_url = Column(String(100), nullable=False)  # 章节内容地址
     novel_name = Column(String(50), nullable=False)  # 所属小说 ------外键关联------
     juan_name = Column(String(100), nullable=False)  # 所属卷本 ------外键关联------
+    get_content_tag = Column(Integer, default='0')
 #    novel_name = Column(String(50), ForeignKey("novel_main_info.novel_id"))  # 所属小说 ------外键关联------
 #    juan_name = Column(String(100), ForeignKey("novel_juan.juan_id"))  # 所属卷本 ------外键关联------
 
@@ -140,10 +141,10 @@ class NovelContent(Base):
     __tablename__ = 'novel_content'
 
     content_id = Column(Integer, primary_key=True)
-    content = Column(Text, nullable=False)  # 章节内容
     novel_name = Column(String(50), nullable=False)  # 所属小说 ------外键关联------
     juan_name = Column(String(100), nullable=False)  # 所属卷本 ------外键关联------
     chapter_name = Column(String(100), nullable=False)  # 所属章节 ------外键关联------
+    content = Column(Text, nullable=False)  # 章节内容
 #    novel_name = Column(String(50), ForeignKey("novel_main_info.novel_id"))  # 所属小说 ------外键关联------
 #    juan_name = Column(String(100), ForeignKey("novel_juan.juan_id"))  # 所属卷本 ------外键关联------
  #   chapter_name = Column(String(100), ForeignKey("novel_chapter.chapter_id"))  # 所属章节 ------外键关联------

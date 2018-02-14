@@ -4,50 +4,24 @@
 #
 # See documentation in:
 # https://doc.scrapy.org/en/latest/topics/items.html
-from contextlib import contextmanager
 
 import scrapy
 import requests
 from scrapy import Request, Selector
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy.linkextractors import LinkExtractor
-from sqlalchemy.orm import sessionmaker
 
 from coolscrapy.items import HuxiuItem, LinkItem, NovelSortItem, NovelMainInfoItem, NovelJuanItem, NovelChapterItem,NovelContentItem
 import re
 #链接爬取蜘蛛，专门为那些爬取有特定规律的链接内容而准备的。
-from coolscrapy.models import NovelMainInfo, db_connect, create_news_table, NovelChapter
+from coolscrapy.models import NovelMainInfo
 
-
-@contextmanager
-def session_scope(Session):
-    """Provide a transactional scope around a series of operations."""
-    session = Session()
-    session.expire_on_commit = False
-
-    try:
-        yield session
-        session.commit()
-    except:
-        session.rollback()
-        raise
-    finally:
-        session.close()
 
 class QuanshuSpider(scrapy.Spider):
-    name = "quanshu"
+    name = "quanshu2"
     allowed_domains = ["quanshuwang.com"]
     start_urls = ["http://www.quanshuwang.com/index.html"]
 
-    novel_main_info_priority = 30
-    novel_total_charpter_info_priority = 20
-    novel_one_charpter_content_priority = 10
-
-    def __init__(self):
-        engine = db_connect()
-        create_news_table(engine)
-        self.Session = sessionmaker(bind=engine)
-        pass
 
 
     #获取小说内容
@@ -102,7 +76,7 @@ class QuanshuSpider(scrapy.Spider):
             for j in range(len(chapterItem['content_url'])):
                 self.logger.info('章节名字:[%s] 章节地址:[%s]' % (chapterItem['chapter_name'][j], chapterItem['content_url'][j]))
                 # self.get_novel_one_charpter_content(content_urls[j])
-                yield Request(chapterItem['content_url'][j], callback=self.parse_novel_one_charpter_content,meta={'novel_name':novel_name,'juan_name':chapterItem['juan_name'] ,'chapter_name':chapterItem['chapter_name'][j]},priority=self.novel_one_charpter_content_priority,dont_filter=True)
+                yield Request(chapterItem['content_url'][j], callback=self.parse_novel_one_charpter_content,meta={'novel_name':novel_name,'juan_name':chapterItem['juan_name'] ,'chapter_name':chapterItem['chapter_name'][j]},dont_filter=True)
                 #if j == 10:
                 #   break
        #pass
@@ -134,7 +108,7 @@ class QuanshuSpider(scrapy.Spider):
 
         #self.get_novel_total_charpter_info(total_charpter_url)
         #total_charpter_url = 'http://www.quanshuwang.com/book/2/2703'
-        yield Request(total_charpter_url, callback=self.parse_novel_total_charpter_info,meta={'novel_name':novel_name},priority=self.novel_total_charpter_info_priority,dont_filter=True)
+        yield Request(total_charpter_url, callback=self.parse_novel_total_charpter_info,meta={'novel_name':novel_name},dont_filter=True)
         pass
 
         #获取某个分类小说所有小说的简介地址
@@ -166,7 +140,7 @@ class QuanshuSpider(scrapy.Spider):
         for url in novel_name_breifurl:
             self.logger.info("开始爬取[ %s ]主要信息，地址为[ %s ]" % (url[0], url[1]))
             #self.get_novel_main_info(url[1])
-            yield Request(url[1], callback=self.parse_novel_main_info,meta={'novel_name':url[0],'sort_name':sort_name},priority=self.novel_main_info_priority,dont_filter=True)
+            yield Request(url[1], callback=self.parse_novel_main_info,meta={'novel_name':url[0],'sort_name':sort_name},dont_filter=True)
             #i += 1
             #if i==10:
             #    break
@@ -177,16 +151,10 @@ class QuanshuSpider(scrapy.Spider):
 
     def parse(self, response):
         self.logger.info('Hi, this is an item page! %s', response.url)
-
-        with session_scope(self.Session) as session:
-            #查询该分类是否已存在
-
-            stored_novel_sort = session.query(NovelChapter).filter(NovelChapter.get_content_tag == '0').first()
-
-
         fenlei_urls = response.xpath("//ul[@class='channel-nav-list']/li/a/@href").extract()
         fenlei_ming = response.xpath("//ul[@class='channel-nav-list']/li/a/text()").extract()
         item = NovelSortItem()
+
         for i in range(len(fenlei_ming)):
             item['sort_name'] = fenlei_ming[i]
             item['sort_url'] = fenlei_urls[i]
@@ -198,7 +166,7 @@ class QuanshuSpider(scrapy.Spider):
             sort_name = fenlei_ming[i]
             sort_url = fenlei_urls[i]
             self.logger.info('开始爬取 [%s] 分类小说'%(sort_name))
-            yield Request(sort_url, callback=self.parse_novel_main_info_of_onesort,meta={'sort_name':sort_name},priority=self.novel_main_info_priority, dont_filter=True)
+            yield Request(sort_url, callback=self.parse_novel_main_info_of_onesort,meta={'sort_name':sort_name},dont_filter=True)
             #if i==10:
             #    break
 

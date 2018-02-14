@@ -9,6 +9,7 @@ import datetime
 import redis
 import json
 import logging
+import time
 from contextlib import contextmanager
 
 from scrapy import signals
@@ -32,14 +33,11 @@ def session_scope(Session):
 
     try:
         yield session
-        print("session_scope commit")
         session.commit()
     except:
-        print("session_scope rollback")
         session.rollback()
         raise
     finally:
-        print("session_scope close")
         session.close()
 
 class ArticleDataBasePipeline(object):
@@ -185,7 +183,10 @@ class NovelSortPipeline(object):
                      )
 
         with session_scope(self.Session) as session:
+            t0 = time.clock()
             stored_novel_sort = session.query(NovelSort).filter(NovelSort.sort_name == item["sort_name"]).first()
+            t1 = time.clock()
+            print("分类查询耗时: ", t1 - t0)
             # 在stu2表，查到StudyRecord表的记录
             if(stored_novel_sort):
                 print("该分类已经存储，sort_name=%s"%(sort_name_tmp))
@@ -219,7 +220,10 @@ class NovelMainInfoPipeline(object):
         )
         with session_scope(self.Session) as session:
             #查询该分类是否已存在
+            t0 = time.clock()
             stored_novel_sort = session.query(NovelMainInfo).filter(NovelMainInfo.novel_name == cur_process_item["novel_name"]).first()
+            t1 = time.clock()
+            print("小说查询耗时: ", t1 - t0)
             # 在stu2表，查到StudyRecord表的记录
             if (stored_novel_sort):
                 print("该小说已经存储，sort_name=%s" % (cur_process_item["novel_name"]))
@@ -252,7 +256,10 @@ class NovelJuanPipeline(object):
             )
             with session_scope(self.Session) as session:
                 # 查询是否已存在
+                t0 = time.clock()
                 stored_tag = session.query(NovelJuan).filter(NovelJuan.juan_name == name).first()
+                t1 = time.clock()
+                print("卷名查询耗时: ", t1 - t0)
                 if (stored_tag):
                     print("该卷名已经存储，juan_name=%s" % (name))
                 else:
@@ -289,7 +296,10 @@ class NovelChapterPipeline(object):
             )
             with session_scope(self.Session) as session:
                 # 查询是否已存在
+                t0 = time.clock()
                 stored_tag = session.query(NovelChapter).filter(NovelChapter.chapter_name == chapter_names[i]).first()
+                t1 = time.clock()
+                print("章节查询耗时: ", t1 - t0)
                 if (stored_tag):
                     print("该章节已经存储，chapter_names=%s" % (chapter_names[i]))
                 else:
@@ -324,7 +334,10 @@ class NovelContentPipeline(object):
             chapter_name=chapter_name2,
         )
         with session_scope(self.Session) as session:                # 查询是否已存在
+            t0 = time.clock()
             stored_tag = session.query(NovelContent).filter(NovelContent.chapter_name == chapter_name2).first()
+            t1 = time.clock()
+            print("内容查询耗时: ",t1 - t0)
             if (stored_tag):
                 print("该章节内容已经存储，chapter_names=%s" % (chapter_name2))
             else:
