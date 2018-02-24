@@ -228,7 +228,7 @@ class NovelMainInfoPipeline(object):
             if (stored_novel_sort):
                 print("该小说已经存储，sort_name=%s" % (cur_process_item["novel_name"]))
             else:
-                print("增加新小说，sort_name=%s" % (cur_process_item["novel_name"]))
+                print("增加新小说，novel_name=%s" % (cur_process_item["novel_name"]))
                 session.add(a)
 
 
@@ -293,13 +293,14 @@ class NovelChapterPipeline(object):
                 content_url=content_urls[i],
                 novel_name = novel_name2,
                 juan_name = juan_name2,
+                get_content_tag = 0,
             )
             with session_scope(self.Session) as session:
                 # 查询是否已存在
-                t0 = time.clock()
+               # t0 = time.clock()
                 stored_tag = session.query(NovelChapter).filter(NovelChapter.chapter_name == chapter_names[i]).first()
-                t1 = time.clock()
-                print("章节查询耗时: ", t1 - t0)
+                #t1 = time.clock()
+              #  print("章节查询耗时: ", t1 - t0)
                 if (stored_tag):
                     print("该章节已经存储，chapter_names=%s" % (chapter_names[i]))
                 else:
@@ -335,7 +336,8 @@ class NovelContentPipeline(object):
         )
         with session_scope(self.Session) as session:                # 查询是否已存在
             t0 = time.clock()
-            stored_tag = session.query(NovelContent).filter(NovelContent.chapter_name == chapter_name2).first()
+            #stored_tag = session.query(NovelContent).filter(NovelContent.chapter_name == chapter_name2).first()
+            stored_tag = 0
             t1 = time.clock()
             print("内容查询耗时: ",t1 - t0)
             if (stored_tag):

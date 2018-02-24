@@ -16,7 +16,7 @@ from sqlalchemy.orm import sessionmaker
 from coolscrapy.items import HuxiuItem, LinkItem, NovelSortItem, NovelMainInfoItem, NovelJuanItem, NovelChapterItem,NovelContentItem
 import re
 #链接爬取蜘蛛，专门为那些爬取有特定规律的链接内容而准备的。
-from coolscrapy.models import NovelMainInfo, db_connect, create_news_table, NovelChapter
+from coolscrapy.models import NovelMainInfo, db_connect, create_news_table, NovelChapter, NovelContent
 
 
 @contextmanager
@@ -39,14 +39,20 @@ class QuanshuSpider(scrapy.Spider):
     allowed_domains = ["quanshuwang.com"]
     start_urls = ["http://www.quanshuwang.com/index.html"]
 
-    novel_main_info_priority = 30
-    novel_total_charpter_info_priority = 20
-    novel_one_charpter_content_priority = 10
+    novel_main_info_priority = 300
+    novel_total_charpter_info_priority = 200
+    novel_one_charpter_content_priority = 100
+
+    geted_all_novel_names = ''
 
     def __init__(self):
         engine = db_connect()
         create_news_table(engine)
         self.Session = sessionmaker(bind=engine)
+        with session_scope(self.Session) as session:
+            # 查询该分类是否已存在
+            self.geted_all_novel_names = session.query(NovelMainInfo, NovelMainInfo.novel_name).all()
+
         pass
 
 
@@ -97,7 +103,7 @@ class QuanshuSpider(scrapy.Spider):
             yield chapterItem
             #if i==10:
             #    break
-
+            '''
             self.logger.info("开始爬取小说章节内容。")
             for j in range(len(chapterItem['content_url'])):
                 self.logger.info('章节名字:[%s] 章节地址:[%s]' % (chapterItem['chapter_name'][j], chapterItem['content_url'][j]))
@@ -105,6 +111,8 @@ class QuanshuSpider(scrapy.Spider):
                 yield Request(chapterItem['content_url'][j], callback=self.parse_novel_one_charpter_content,meta={'novel_name':novel_name,'juan_name':chapterItem['juan_name'] ,'chapter_name':chapterItem['chapter_name'][j]},priority=self.novel_one_charpter_content_priority,dont_filter=True)
                 #if j == 10:
                 #   break
+        '''
+            self.logger.info("暂不爬取小说章节内容。")
        #pass
 
     #获取小说主要信息，如：作者、内容简介、小说状态、最近更新时间
@@ -118,7 +126,9 @@ class QuanshuSpider(scrapy.Spider):
         book_detail_div = hxs.xpath('//div[@class="bookDetail"]')[0]
         status = book_detail_div.xpath('dl/dd/text()')[0].extract()
         author = book_detail_div.xpath('dl/dd/text()')[1].extract()
-        last_update_time = (book_detail_div.xpath('dl/dd/ul/li/text()')[0].extract())[2:-1]
+        last_update_time_lis = book_detail_div.xpath('dl/dd/ul/li/text()')
+        if last_update_time_lis:
+            last_update_time = last_update_time_lis[0].extract()[2:-1]
         novel_name = response.meta['novel_name']
         sort_name = response.meta['sort_name']
         self.logger.info("小说:[%s] 简介:[%s] 总章节地址:[%s] 小说状态:[%s] 作者:[%s] 最后更新时间:[%s]" % (novel_name,breif,total_charpter_url,status,author,last_update_time))
@@ -154,34 +164,117 @@ class QuanshuSpider(scrapy.Spider):
     # 获取某个分类所有小说的主要信息
     def parse_novel_main_info_of_onesort(self,response):
         sort_name = response.meta['sort_name']
+        self.logger.info('小说分类:[%s] ,response.url:[%s]' % (sort_name,response.url))
+        reg = r'<a target="_blank" title="(.*?)" href="(.*?)" class="clearfix stitle">'
+        novel_name_breifurl = re.findall(reg, response.text)
+        self.logger.info(novel_name_breifurl)
+
+        for url in novel_name_breifurl:
+            find_tag = False
+            novel_name = url[0]
+            novel_main_info_url = url[1]
+            self.logger.info("开始爬取[ %s ]主要信息，地址为[ %s ]" % (novel_name, novel_main_info_url))
+            for novel_row in self.geted_all_novel_names:
+                #self.logger.info("novel_row.novel_name=[%s]"%(novel_row.novel_name))
+                if novel_name == novel_row.novel_name:
+                    self.logger.info("该小说已存在[%s]" % (novel_row.novel_name))
+                    find_tag = True
+                    break
+
+
+            if find_tag==False:
+                self.logger.info("增加新小说[%s]" % (novel_name))
+                yield Request(novel_main_info_url, callback=self.parse_novel_main_info,meta={'novel_name':novel_name,'sort_name':sort_name},priority=self.novel_main_info_priority,dont_filter=True)
+
+    pass
+
+
+    # 获取某个分类所有小说的主要信息
+    def parse_all_novel_of_onesort(self,response):
+        sort_name = response.meta['sort_name']
         total_page_reg = r'<em id="pagestats">1/(.*?)</em>'
         numstr = re.findall(total_page_reg, response.text)
         total_page_num = int(numstr[0])
         self.logger.info('小说分类:[%s] ,response.url:[%s] ,小说分类总页数:[%d]' % (sort_name,response.url, total_page_num))
-        #2.获取第一页里面所有小说信息
-        reg = r'<a target="_blank" title="(.*?)" href="(.*?)" class="clearfix stitle">'
-        novel_name_breifurl = re.findall(reg, response.text)
-        self.logger.info(novel_name_breifurl)
-        i=0
-        for url in novel_name_breifurl:
-            self.logger.info("开始爬取[ %s ]主要信息，地址为[ %s ]" % (url[0], url[1]))
-            #self.get_novel_main_info(url[1])
-            yield Request(url[1], callback=self.parse_novel_main_info,meta={'novel_name':url[0],'sort_name':sort_name},priority=self.novel_main_info_priority,dont_filter=True)
-            #i += 1
-            #if i==10:
-            #    break
+        base_url = (response.url.split('_'))[0]
+
+        for page_num in range(1,total_page_num):
+            url = base_url+"_"+str(page_num)+".html"
+            yield Request(url, callback=self.parse_novel_main_info_of_onesort,meta={'sort_name':sort_name},priority=self.novel_main_info_priority, dont_filter=True)
 
         pass
 
+    #查询NovelChapter表中哪些文章已获取并置标志位
+    def zhenglishuju(self):
+        self.logger.info("开始整理数据库")
+        with session_scope(self.Session) as session:
+            #查询该分类是否已存在
+            all_chapters = session.query(NovelChapter,NovelChapter.chapter_name).all()
+            all_contents = session.query(NovelContent,NovelContent.chapter_name).all()
+            for chap_row in all_chapters:
+                self.logger.info("chap_row.chapter_name=[%s]"%(chap_row.chapter_name))
+                find_tag = False
+                for cont_row in all_contents:
+                    #self.logger.info("cont_row.chapter_name=[%s]" % (cont_row.chapter_name))
+                    if chap_row.chapter_name == cont_row.chapter_name:
+                        find_tag = True
+                        break
 
+                if find_tag:
+                    self.logger.info("该章节已存储[ %s ]" % (chap_row.chapter_name))
+                    chap_row.NovelChapter.get_content_tag = 1
+                    session.commit()
+                else:
+                    self.logger.info("未存储[ %s ]" % (chap_row.chapter_name))
+
+    # 获取小说内容
+    def parse_novel_one_charpter_content_by_NovelChapter(self, response):
+        # response = self.get_req(content_url)
+        hxs = Selector(text=response.text)
+        content_div = hxs.xpath('//div[@id="content"]')
+        content = hxs.xpath('//div[@id="content"]')[0].extract()
+        # self.logger.info(content)
+        self.logger.info("parse_novel_one_charpter_content_by_NovelChapter 获取到小说章节内容。")
+        novel_content_item = NovelContentItem()
+        novel_content_item['novel_name'] = response.meta['novel_name']
+        novel_content_item['juan_name'] = response.meta['juan_name']
+        novel_content_item['chapter_name'] = response.meta['chapter_name']
+        novel_content_item['content'] = content
+
+        yield novel_content_item
+        session = response.meta['session']
+        chap_row = response.meta['chap_row']
+        chap_row.NovelChapter.get_content_tag = 1
+        session.commit()
+        #pass
+
+    #根据NovelChapter get_content_tag标志位，如果未获取则获取内容，并置标志位
+    def get_content_by_NovelChapter(self):
+        self.logger.info("开始根据数据库获取文章内容")
+        with session_scope(self.Session) as session:
+            #查询该分类是否已存在
+            all_chapters = session.query(NovelChapter,NovelChapter.chapter_name).all()
+           # all_contents = session.query(NovelContent,NovelContent.chapter_name).all()
+            for chap_row in all_chapters:
+                if chap_row.NovelChapter.get_content_tag == b'\x01':
+                    self.logger.info("该文章已获取 [ %s ]"%(chap_row.NovelChapter.chapter_name))
+                    continue
+                else:
+                    url = chap_row.NovelChapter.content_url
+                    novel_name = chap_row.NovelChapter.novel_name
+                    juan_name = chap_row.NovelChapter.juan_name
+                    chapter_name = chap_row.NovelChapter.chapter_name
+                    self.logger.info("新文章 [ %s ]" % (chap_row.NovelChapter.chapter_name))
+                    yield Request(url,
+                                  callback=self.parse_novel_one_charpter_content_by_NovelChapter,
+                                  meta={'novel_name': novel_name, 'juan_name': juan_name,'chapter_name': chapter_name,'session':session,'chap_row':chap_row},
+                                  priority=self.novel_one_charpter_content_priority,dont_filter=True)
+        pass
 
     def parse(self, response):
         self.logger.info('Hi, this is an item page! %s', response.url)
-
-        with session_scope(self.Session) as session:
-            #查询该分类是否已存在
-
-            stored_novel_sort = session.query(NovelChapter).filter(NovelChapter.get_content_tag == '0').first()
+        #self.zhenglishuju()
+        #self.get_content_by_NovelChapter()
 
 
         fenlei_urls = response.xpath("//ul[@class='channel-nav-list']/li/a/@href").extract()
@@ -198,7 +291,32 @@ class QuanshuSpider(scrapy.Spider):
             sort_name = fenlei_ming[i]
             sort_url = fenlei_urls[i]
             self.logger.info('开始爬取 [%s] 分类小说'%(sort_name))
-            yield Request(sort_url, callback=self.parse_novel_main_info_of_onesort,meta={'sort_name':sort_name},priority=self.novel_main_info_priority, dont_filter=True)
+            if sort_name == '玄幻魔法':
+                priority = self.novel_main_info_priority + 12
+            elif sort_name == '武侠修真':
+                priority = self.novel_main_info_priority + 11
+            elif sort_name == '纯爱耽美':
+                priority = self.novel_main_info_priority + 10
+            elif sort_name == '都市言情':
+                priority = self.novel_main_info_priority + 9
+            elif sort_name == '职场校园':
+                priority = self.novel_main_info_priority + 8
+            elif sort_name == '穿越重生':
+                priority = self.novel_main_info_priority + 7
+            elif sort_name == '历史军事':
+                priority = self.novel_main_info_priority + 6
+            elif sort_name == '网游动漫':
+                priority = self.novel_main_info_priority + 5
+            elif sort_name == '恐怖灵异':
+                priority = self.novel_main_info_priority + 4
+            elif sort_name == '科幻小说':
+                priority = self.novel_main_info_priority + 3
+            elif sort_name == '美文名著':
+                priority = self.novel_main_info_priority + 2
+            elif sort_name == '热门推荐':
+                priority = self.novel_main_info_priority + 1
+
+            yield Request(sort_url, callback=self.parse_all_novel_of_onesort,meta={'sort_name':sort_name},priority=priority, dont_filter=True)
             #if i==10:
             #    break
 
